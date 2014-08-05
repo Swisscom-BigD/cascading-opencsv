@@ -91,12 +91,12 @@
 
   <distributionManagement>
     <repository>
-      <id>internal</id>
+      <id>tresata.releases</id>
       <name>Repository Archiva Managed internal Repository</name>
       <url>http://server01:8080/archiva/repository/internal/</url>
     </repository>
     <snapshotRepository>
-      <id>snapshots</id>
+      <id>tresata.snapshots</id>
       <name>Repository Archiva Managed snapshots Repository</name>
       <url>http://server01:8080/archiva/repository/snapshots/</url>
     </snapshotRepository>
