@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.org/tresata/cascading-opencsv.svg?branch=master)](https://travis-ci.org/tresata/cascading-opencsv)
+[![Build Status](https://travis-ci.org/tresata/cascading-opencsv.svg?branch=tresata)](https://travis-ci.org/tresata/cascading-opencsv)
 
 # Cascading OpenCsv Scheme
 
