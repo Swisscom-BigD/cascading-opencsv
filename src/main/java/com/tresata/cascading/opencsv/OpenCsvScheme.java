@@ -15,6 +15,8 @@ import cascading.tap.hadoop.Hfs;
 import cascading.tuple.Fields;
 import cascading.tuple.Tuple;
 import cascading.tuple.TupleEntryIterator;
+import cascading.tuple.coerce.Coercions;
+import cascading.tuple.type.CoercibleType;
 
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
@@ -38,8 +40,9 @@ public class OpenCsvScheme extends TextLine {
     private final char escape;
     private final boolean strict;
     private final String charsetName;
+    private CoercibleType[] coercibles;
 
-    public OpenCsvScheme(final Fields fields, final boolean hasHeader, final char separator, final char quote, final char escape, 
+    public OpenCsvScheme(final Fields fields, final Class[] types, final boolean hasHeader, final char separator, final char quote, final char escape,
                          final boolean strict, final String charsetName) {
         super(TextLine.Compress.DEFAULT);
         setCharsetName(charsetName);
@@ -52,34 +55,39 @@ public class OpenCsvScheme extends TextLine {
         this.escape = escape;
         this.strict = strict;
         this.charsetName = charsetName != null ? charsetName : "UTF8";
+
+        if(types != null)
+            coercibles = Coercions.coercibleArray(types.length, types);
+        else
+            coercibles = null;
     }
     
     /**
      * Use for files without headers.
      */
-    public OpenCsvScheme(final Fields fields, final char separator, final char quote, final char escape, final boolean strict) {
-        this(fields, false, separator, quote, escape, strict, null);
+    public OpenCsvScheme(final Fields fields, final Class[] types, final char separator, final char quote, final char escape, final boolean strict) {
+        this(fields, types, false, separator, quote, escape, strict, null);
     }
 
     /**
      * Use for comma separated, quoted and slash (\) escaped files without headers.
      */
     public OpenCsvScheme(final Fields fields) {
-        this(fields, false, ',', '"', '\\', false, null);
+        this(fields, null, false, ',', '"', '\\', false, null);
     }
 
     /**
      * Use for files with headers.
      */
     public OpenCsvScheme(final char separator, final char quote, final char escape, final boolean strict) {
-        this(Fields.UNKNOWN, true, separator, quote, escape, strict, null);
+        this(Fields.UNKNOWN, null, true, separator, quote, escape, strict, null);
     }
 
     /**
      * Use for comma separated, quoted and slash (\) escaped files with headers.
      */
     public OpenCsvScheme() {
-        this(Fields.UNKNOWN, true, ',', '"', '\\', false, null);
+        this(Fields.UNKNOWN, null, true, ',', '"', '\\', false, null);
     }
     
     public boolean hasHeader() {
@@ -140,7 +148,31 @@ public class OpenCsvScheme extends TextLine {
         sourceCall.getContext()[2] = Charset.forName(charsetName);
         sourceCall.getContext()[3] = createCsvParser();
     }
-    
+
+    protected Object[] coerceParsedLine(Object[] split)
+    {
+        if(coercibles != null)
+        {
+            Object[] result = new Object[split.length];
+
+            for(int i = 0; i < split.length; i++)
+            {
+                try
+                {
+                    result[i] = coercibles[i].canonical(split[i]);
+                }
+                catch(Exception exception)
+                {
+                    result[i] = null;
+                }
+            }
+
+            split = result;
+        }
+
+        return split;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public boolean source(final FlowProcess<JobConf> flowProcess, final SourceCall<Object[], RecordReader> sourceCall) throws IOException {
@@ -149,9 +181,9 @@ public class OpenCsvScheme extends TextLine {
         while (sourceCall.getInput().next(context[0], context[1])) {
             if (hasHeader && ((LongWritable) context[0]).get() == 0)
                 continue;
-            final String[] split;
+            final Object[] split;
             try {
-                split = ((CSVParser) sourceCall.getContext()[3]).parseLine(makeEncodedString(context));
+                split = coerceParsedLine(((CSVParser) sourceCall.getContext()[3]).parseLine(makeEncodedString(context)));
             } catch (IOException exc) {
                 if (strict)
                     throw exc;
@@ -159,9 +191,9 @@ public class OpenCsvScheme extends TextLine {
                 flowProcess.increment("com.tresata.cascading.scheme.OpenCsvScheme", "Invalid Records", 1);
                 continue;
             }
-            for (int i = 0; i < split.length; i++)
+            /*for (int i = 0; i < split.length; i++)
                 if (split[i].equals(""))
-                    split[i] = null;
+                    split[i] = null;*/
             final Tuple tuple = sourceCall.getIncomingEntry().getTuple();
             tuple.clear();
             tuple.addAll(split);
